@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * 主页记录列表项：标题 + 修改时间 + 2 行内容预览。
- * 置顶记录显示 Pin 标记与日期徽标（置顶跨日期，需要区分归属），
- * 卡片常显置顶/取消置顶按钮；右键弹出删除菜单（移入回收站）。
+ * 置顶记录显示 Pin 标记；卡片常显置顶/取消置顶按钮；右键弹出删除菜单（移入回收站）。
  */
 import { onBeforeUnmount, onMounted, reactive } from "vue";
 import { Pin, Trash2 } from "@lucide/vue";
 import { cn, maskAttachmentMarkers } from "@/lib/utils";
-import { fmtDateCn, fmtTime } from "@/composables/useDate";
+import { fmtTime } from "@/composables/useDate";
 import type { WorkRecord } from "@/types/work-record";
 
 const props = defineProps<{
@@ -90,16 +89,7 @@ onBeforeUnmount(() => {
       <div class="min-w-0 flex-1">
         <div class="flex items-baseline justify-between gap-2">
           <p class="flex min-w-0 items-center gap-1 truncate text-sm font-medium">
-            <!-- 置顶标记（Pin 图标承担置顶语义，不依赖颜色） -->
-            <Pin v-if="props.record.is_pinned" class="h-3.5 w-3.5 shrink-0 text-primary" />
             <span class="truncate">{{ props.record.title || "（无标题）" }}</span>
-            <!-- 置顶记录跨日期显示，需要日期徽标区分归属 -->
-            <span
-              v-if="props.record.is_pinned"
-              class="shrink-0 rounded bg-accent px-1 text-[10px] font-normal text-muted-foreground"
-            >
-              {{ fmtDateCn(props.record.record_date) }}
-            </span>
           </p>
           <span class="flex shrink-0 items-center gap-1">
             <span class="text-[11px] tabular-nums text-muted-foreground">

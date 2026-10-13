@@ -62,3 +62,48 @@ jobs:
           # 只打 NSIS 安装包：WiX3 的 light.exe 处理不了中文文件名（工作日志_...msi），
           # 中文产品名 + MSI 是 Tauri 已知问题；NSIS 为 Unicode 版，中文名无碍
           args: --target ${{ matrix.target }} --bundles nsis
+
+      # 免安装版：裸 exe 自包含（前端资源已嵌入，依赖系统 WebView2），
+      # 下载后直接双击运行，无需安装向导
+      - name: 上传免安装版 exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-journal-portable-${{ matrix.suffix }}
+          path: src-tauri/target/release/work-journal.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin,universal-apple-darwin
+
+      - name: 缓存 Rust 依赖
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建 macOS 应用与 dmg（universal：Intel + Apple Silicon）
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # 与 Windows job 共用同一 Release（tauri-action 自动复用已存在的 release）
+          tagName: v__VERSION__
+          releaseName: 工作日志 v__VERSION__
+          releaseBody: Windows（x64 / arm64 安装包与免安装版）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）
+          releaseDraft: true
+          args: --target universal-apple-darwin

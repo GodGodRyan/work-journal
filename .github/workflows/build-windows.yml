@@ -12,6 +12,15 @@ on:
 
 jobs:
   build-windows:
+    strategy:
+      matrix:
+        include:
+          # x64：主流 Windows 电脑
+          - target: x86_64-pc-windows-msvc
+            suffix: x64
+          # arm64：骁龙等 ARM 芯片的 Windows 笔记本
+          - target: aarch64-pc-windows-msvc
+            suffix: arm64
     runs-on: windows-latest
     steps:
       - name: 检出代码
@@ -25,6 +34,8 @@ jobs:
 
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: 缓存 Rust 依赖
         uses: swatinem/rust-cache@v2
@@ -34,7 +45,7 @@ jobs:
       - name: 安装前端依赖
         run: npm ci
 
-      - name: 构建 Windows 安装包
+      - name: 构建 Windows 安装包（${{ matrix.suffix }}）
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,5 +53,6 @@ jobs:
           # 推送 tag 时发布 Releases（草稿，手动确认后对外可见）；手动触发时仅上传 Artifacts
           tagName: v__VERSION__
           releaseName: 工作日志 v__VERSION__
-          releaseBody: Windows 安装包（NSIS）
+          releaseBody: Windows 安装包（NSIS，x64 与 arm64）
           releaseDraft: true
+          args: --target ${{ matrix.target }}

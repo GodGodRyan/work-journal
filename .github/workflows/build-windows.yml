@@ -140,11 +140,16 @@ jobs:
       - name: 创建 Release 草稿
         run: |
           # merge-multiple 解压后保留目录结构（target/<triple>/release/...），
-          # 需 find 递归收集文件而非 glob 目录
+          # 需 find 递归收集文件而非 glob 目录；
+          # 创建与上传拆两步：gh release create 带文件一步完成时上传偶发 404
           gh release create "${GITHUB_REF_NAME}" \
             --draft \
             --title "工作日志 ${GITHUB_REF_NAME}" \
-            --notes "Windows（x64 / arm64 安装包与免安装版）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）" \
+            --notes "Windows（x64 / arm64 安装包与免安装版）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）"
+
+      - name: 上传资产
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
             $(find ./bundles -type f \( -name '*.exe' -o -name '*.dmg' \))
 
       - name: 列出已上传资产

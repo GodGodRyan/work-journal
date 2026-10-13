@@ -55,4 +55,6 @@ jobs:
           releaseName: 工作日志 v__VERSION__
           releaseBody: Windows 安装包（NSIS，x64 与 arm64）
           releaseDraft: true
-          args: --target ${{ matrix.target }}
+          # 只打 NSIS 安装包：WiX3 的 light.exe 处理不了中文文件名（工作日志_...msi），
+          # 中文产品名 + MSI 是 Tauri 已知问题；NSIS 为 Unicode 版，中文名无碍
+          args: --target ${{ matrix.target }} --bundles nsis

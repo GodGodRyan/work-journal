@@ -93,7 +93,9 @@ jobs:
       - name: 安装 Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-apple-darwin,aarch64-apple-darwin,universal-apple-darwin
+          # universal-apple-darwin 不是 rustup 可下载目标：tauri 用这两个底层
+          # 目标分别编译后 lipo 合成 universal 包，只需安装两者
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
       - name: 缓存 Rust 依赖
         uses: swatinem/rust-cache@v2

@@ -1,0 +1,46 @@
+# 构建 Windows 安装包（NSIS）
+# 触发方式：
+#   1. Actions 页面手动触发（workflow_dispatch），产物在运行页 Artifacts 下载
+#   2. 推送 v* 标签（如 v0.1.0），自动构建并发为 GitHub Releases 草稿
+name: 构建 Windows 安装包
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装 Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 Rust 依赖
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建 Windows 安装包
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # 推送 tag 时发布 Releases（草稿，手动确认后对外可见）；手动触发时仅上传 Artifacts
+          tagName: v__VERSION__
+          releaseName: 工作日志 v__VERSION__
+          releaseBody: Windows 安装包（NSIS）
+          releaseDraft: true

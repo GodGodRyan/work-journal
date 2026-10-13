@@ -1,0 +1,27 @@
+[package]
+name = "work-journal"
+version = "0.1.0"
+description = "每日工作记录记事本（Tauri 2 + Vue3 + SQLite）"
+authors = ["rhu"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# bundled: 自带编译 SQLite（含 FTS5），无需系统依赖；backup: 在线备份 API；
+# functions: 注册 cjk_expand UDF（中文单字展开，FTS5 子串搜索的关键）
+rusqlite = { version = "0.32", features = ["bundled", "backup", "functions"] }
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
+base64 = "0.23.1"
+regex = "1"
+
+# 减小发行版体积
+[profile.release]
+strip = true

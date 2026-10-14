@@ -117,16 +117,11 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # gh release 需要 git 仓库上下文，必须先 checkout；
-      # 不勾 fetch-tags：checkout@v4 的 fetch-tags 在「tag push 触发」时会同时
-      # fetch commit SHA 与同名 tag 引用（refspec 目标冲突），git 报
-      # Cannot fetch both ... to refs/tags/...；改为默认 checkout 后手动拉触发 tag
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 拉取触发 tag（gh release create 需要本地能看到该 tag）
-        run: git fetch --depth=1 origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
-
+      # 本 job 不 checkout：gh 全部显式 --repo 走 API，不依赖本地 git/tag。
+      # 历史坑：checkout 在「tag push 触发」时把触发 commit fetch 到 refs/tags/<tag>，
+      # 与远程同名 tag 引用冲突（Cannot fetch both ...）；本地无 tag 时
+      # gh release create 又会误建 untagged release（无法上传资产）。
+      # --target 显式指定 commit：远程 tag 已存在则直接关联该 tag，彻底绕开 git。
       - name: 下载全部产物
         uses: actions/download-artifact@v4
         with:
@@ -154,15 +149,17 @@ jobs:
           # 需 find 递归收集文件而非 glob 目录；
           # 创建与上传拆两步：gh release create 带文件一步完成时上传偶发 404
           gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --draft \
-            --verify-tag \
+            --target "${GITHUB_SHA}" \
             --title "工作日志 ${GITHUB_REF_NAME}" \
             --notes "Windows（x64 / arm64 免安装版，下载后直接双击运行）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）"
 
       - name: 上传资产
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
             $(find ./bundles -type f \( -name '*.exe' -o -name '*.dmg' \))
 
       - name: 列出已上传资产
-        run: gh release view "${GITHUB_REF_NAME}" --json assets --jq '.assets[].name'
+        run: gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name'

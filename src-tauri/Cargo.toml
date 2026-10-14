@@ -1,6 +1,6 @@
 [package]
 name = "work-journal"
-version = "0.1.9"
+version = "0.1.10"
 description = "每日工作记录记事本（Tauri 2 + Vue3 + SQLite）"
 authors = ["rhu"]
 edition = "2021"

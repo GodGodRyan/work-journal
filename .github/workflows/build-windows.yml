@@ -129,9 +129,10 @@ jobs:
           merge-multiple: true
           path: bundles
 
-      # 免安装 exe 原始名是 work-journal.exe（x64/arm64 各一份，靠路径里的
-      # target triple 区分），重命名为中文名再上传，release 资产即中文文件名
-      - name: 重命名免安装版为中文文件名
+      # 资产统一英文文件名：GitHub release 上传 API 会把非 ASCII 文件名 sanitize
+      # 成下划线（工作日志_...exe 变 _...exe，服务端行为，任何客户端都保不住中文），
+      # 故主动用英文名；release 标题/说明文字不受影响，仍用中文
+      - name: 重命名产物为规范英文文件名
         run: |
           find ./bundles -type f -name 'work-journal.exe' | while IFS= read -r f; do
             case "$f" in
@@ -139,7 +140,10 @@ jobs:
               *aarch64*) suffix="arm64" ;;
               *)         suffix="exe" ;;
             esac
-            mv "$f" "$(dirname "$f")/工作日志_${GITHUB_REF_NAME#v}_${suffix}.exe"
+            mv "$f" "$(dirname "$f")/work-journal_${GITHUB_REF_NAME#v}_${suffix}.exe"
+          done
+          find ./bundles -type f -name '*.dmg' | while IFS= read -r f; do
+            mv "$f" "$(dirname "$f")/work-journal_${GITHUB_REF_NAME#v}_universal.dmg"
           done
           find ./bundles -type f
 

@@ -1,11 +1,11 @@
-# 构建三平台安装包
+# 构建三平台发行包
 # 触发方式：
-#   1. 推送 v* 标签：构建 Windows(x64/arm64) + macOS(universal)，并发布为 GitHub Releases 草稿
+#   1. 推送 v* 标签：构建 Windows(x64/arm64 免安装版) + macOS(universal dmg)，并发布为 GitHub Releases 草稿
 #   2. Actions 页面手动触发：仅构建，产物在运行页 Artifacts 下载
 #
 # 注：不用 tauri-action 发 release（它会 sanitize 中文资产文件名，工作日志_...exe 变 _...exe），
 #     改为统一 release job 用 gh 上传原始文件，文件名保持中文。
-name: 构建三平台安装包
+name: 构建三平台发行包
 
 on:
   workflow_dispatch:
@@ -52,21 +52,12 @@ jobs:
       - name: 安装前端依赖
         run: npm ci
 
-      - name: 构建 Windows 安装包（${{ matrix.suffix }}）
+      - name: 构建 Windows 免安装版（${{ matrix.suffix }}）
         uses: tauri-apps/tauri-action@v0
         with:
-          # 只打 NSIS 安装包：WiX3 的 light.exe 处理不了中文文件名（工作日志_...msi），
-          # 中文产品名 + MSI 是 Tauri 已知问题；NSIS 为 Unicode 版，中文名无碍
-          args: --target ${{ matrix.target }} --bundles nsis
-
-      - name: 上传安装包（release 用）
-        uses: actions/upload-artifact@v4
-        with:
-          name: work-journal-${{ matrix.suffix }}-setup
-          # 带 --target 时产物在 target/<triple>/release/，两条路径互为保险
-          path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.exe
+          # 只编译裸 exe，不打安装包：用户要免安装版（下载直接双击运行）；
+          # 裸 exe 自包含前端资源，依赖系统 WebView2，数据存 %APPDATA%
+          args: --target ${{ matrix.target }} --no-bundle
 
       # 免安装版：裸 exe 自包含（前端资源已嵌入，依赖系统 WebView2），
       # 下载后直接双击运行，无需安装向导
@@ -126,9 +117,13 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # gh release 需要 git 仓库上下文，必须先 checkout
+      # gh release 需要 git 仓库上下文，必须先 checkout；
+      # fetch-tags：checkout 默认不拉 tag 引用，本地看不到 v0.1.x 会让
+      # gh release create 误建 untagged release（untagged release 无法上传资产 → 404）
       - name: 检出代码
         uses: actions/checkout@v4
+        with:
+          fetch-tags: true
 
       - name: 下载全部产物
         uses: actions/download-artifact@v4
@@ -137,6 +132,20 @@ jobs:
           merge-multiple: true
           path: bundles
 
+      # 免安装 exe 原始名是 work-journal.exe（x64/arm64 各一份，靠路径里的
+      # target triple 区分），重命名为中文名再上传，release 资产即中文文件名
+      - name: 重命名免安装版为中文文件名
+        run: |
+          find ./bundles -type f -name 'work-journal.exe' | while IFS= read -r f; do
+            case "$f" in
+              *x86_64*)  suffix="x64" ;;
+              *aarch64*) suffix="arm64" ;;
+              *)         suffix="exe" ;;
+            esac
+            mv "$f" "$(dirname "$f")/工作日志_${GITHUB_REF_NAME#v}_${suffix}.exe"
+          done
+          find ./bundles -type f
+
       - name: 创建 Release 草稿
         run: |
           # merge-multiple 解压后保留目录结构（target/<triple>/release/...），
@@ -144,8 +153,9 @@ jobs:
           # 创建与上传拆两步：gh release create 带文件一步完成时上传偶发 404
           gh release create "${GITHUB_REF_NAME}" \
             --draft \
+            --verify-tag \
             --title "工作日志 ${GITHUB_REF_NAME}" \
-            --notes "Windows（x64 / arm64 安装包与免安装版）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）"
+            --notes "Windows（x64 / arm64 免安装版，下载后直接双击运行）+ macOS（universal dmg，Intel 与 Apple Silicon 通用）"
 
       - name: 上传资产
         run: |

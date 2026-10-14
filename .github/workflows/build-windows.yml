@@ -118,12 +118,14 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       # gh release 需要 git 仓库上下文，必须先 checkout；
-      # fetch-tags：checkout 默认不拉 tag 引用，本地看不到 v0.1.x 会让
-      # gh release create 误建 untagged release（untagged release 无法上传资产 → 404）
+      # 不勾 fetch-tags：checkout@v4 的 fetch-tags 在「tag push 触发」时会同时
+      # fetch commit SHA 与同名 tag 引用（refspec 目标冲突），git 报
+      # Cannot fetch both ... to refs/tags/...；改为默认 checkout 后手动拉触发 tag
       - name: 检出代码
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
+
+      - name: 拉取触发 tag（gh release create 需要本地能看到该 tag）
+        run: git fetch --depth=1 origin "+refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
 
       - name: 下载全部产物
         uses: actions/download-artifact@v4

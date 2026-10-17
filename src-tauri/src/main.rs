@@ -60,6 +60,7 @@ fn main() {
             commands::delete_attachment,
             commands::set_attachment_width,
             commands::get_attachment_data,
+            commands::export_attachment,
             commands::get_db_path,
             commands::get_app_version,
         ])

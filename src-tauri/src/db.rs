@@ -816,6 +816,19 @@ impl Db {
         Ok(())
     }
 
+    /// 附件磁盘文件信息（右键导出媒体文件用）：返回 (stored_name, file_name)
+    pub fn attachment_file(&self, id: i64) -> Result<(String, String)> {
+        let row: Option<(String, String)> = self
+            .conn
+            .query_row(
+                "SELECT stored_name, file_name FROM attachments WHERE id = ?1",
+                params![id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        row.ok_or_else(|| anyhow!("附件不存在"))
+    }
+
     /// 附件内容 → data URL（媒体块 Ctrl+C 复制到剪贴板用）。
     /// 超过 100MB 拒绝（剪贴板承载大文件会导致系统卡顿）
     pub fn attachment_data_url(&self, id: i64, attach_dir: &Path) -> Result<String> {

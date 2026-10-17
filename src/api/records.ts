@@ -174,6 +174,11 @@ export function getAttachmentData(id: number): Promise<string> {
   return invoke("get_attachment_data", { id });
 }
 
+/** 导出附件到本地文件（右键「导出媒体文件」）。返回保存路径，用户取消返回 null */
+export function exportAttachment(id: number): Promise<string | null> {
+  return invoke("export_attachment", { id });
+}
+
 /** 应用版本号 */
 export function appVersion(): Promise<string> {
   return invoke("get_app_version");

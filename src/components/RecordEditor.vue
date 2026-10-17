@@ -12,7 +12,7 @@
  * - 选中文字右键弹出格式菜单：加粗 / 字号 / 颜色
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, reactive, ref, watch } from "vue";
-import { Bold, Loader2, NotebookPen, Pin, Plus, Save, Trash2, X } from "@lucide/vue";
+import { Bold, Copy, Download, Loader2, NotebookPen, Pin, Plus, Save, Trash2, X } from "@lucide/vue";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import { Color, FontSize, TextStyle } from "@tiptap/extension-text-style";
@@ -629,20 +629,72 @@ function placeCaretAfterLastFigure(): void {
  * 缓存未命中时仅复制 HTML（粘贴回编辑器仍可还原媒体块）。
  */
 function onEditorCopy(view: EditorView, event: Event): boolean {
-  const e = event as ClipboardEvent;
   const sel = view.state.selection;
-  if (sel instanceof NodeSelection && sel.node.type.name === "attachment" && e.clipboardData) {
-    const id = sel.node.attrs.id as number | null;
-    const cached = id != null ? attachCopyCache.get(id) : undefined;
-    if (cached) {
-      try {
-        e.clipboardData.items.add(dataUrlToFile(cached.dataUrl, cached.name));
-      } catch {
-        // 剪贴板写入失败：HTML 复制仍生效，不打断
-      }
-    }
+  if (!(sel instanceof NodeSelection && sel.node.type.name === "attachment")) {
+    return false; // 文字复制走 Tiptap 默认流程
   }
-  return false; // 继续 Tiptap 默认复制
+  // 媒体块复制：阻止默认复制，改由 navigator.clipboard.write 写入 HTML + 文件。
+  // 原因：WebKit 的 copy 事件不支持 clipboardData.items.add(File)（静默失败不抛异常），
+  // 导致「粘贴回编辑器正常、粘贴到外部无文件」；ClipboardItem API 两个平台都支持。
+  event.preventDefault();
+  const id = sel.node.attrs.id as number | null;
+  void copyAttachmentToClipboard(view, sel, id);
+  return true;
+}
+
+/** 组装 ClipboardItem（HTML + 纯文本 + 文件）写入剪贴板；失败 toast 可见，不静默。
+ *  返回是否写入成功（Ctrl+C 不提示成功；右键复制成功时由调用方提示） */
+async function copyAttachmentToClipboard(
+  view: EditorView,
+  sel: NodeSelection,
+  id: number | null,
+): Promise<boolean> {
+  const file = await resolveAttachFile(id);
+  if (!file) return false; // 失败原因已在 resolveAttachFile 内 toast
+  const { dom, text } = view.serializeForClipboard(sel.content());
+  // dom 是 DocumentFragment（无 innerHTML），包一层容器再取 HTML
+  const wrap = document.createElement("div");
+  wrap.appendChild(dom.cloneNode(true));
+  const html = wrap.innerHTML;
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([text || file.name], { type: "text/plain" }),
+        [file.type]: file,
+      }),
+    ]);
+    return true;
+  } catch (err) {
+    toast({
+      title: "复制附件失败",
+      description: `剪贴板写入被拒绝：${errMsg(err)}`,
+      variant: "destructive",
+    });
+    return false;
+  }
+}
+
+/** 取附件 File：优先选中时预取的缓存；未命中则实时读取（本地读取 <1s，在用户手势窗口内） */
+async function resolveAttachFile(id: number | null): Promise<File | null> {
+  if (id == null) {
+    toast({ title: "复制附件失败", description: "附件 id 无效", variant: "destructive" });
+    return null;
+  }
+  const cached = attachCopyCache.get(id);
+  if (cached) return dataUrlToFile(cached.dataUrl, cached.name);
+  try {
+    const dataUrl = await api.getAttachmentData(id);
+    const name = attachments.value.find((a) => a.id === id)?.file_name ?? "附件";
+    return dataUrlToFile(dataUrl, name);
+  } catch (err) {
+    toast({
+      title: "复制附件失败",
+      description: `附件数据读取失败：${errMsg(err)}`,
+      variant: "destructive",
+    });
+    return null;
+  }
 }
 
 // ---- 右键格式菜单 ----
@@ -686,6 +738,36 @@ function deleteSelectedMedia(): void {
   if (!(sel instanceof NodeSelection) || sel.node.type.name !== "attachment") return;
   ed.view.dispatch(ed.state.tr.delete(sel.from, sel.to));
   closeCtxMenu();
+}
+
+/** 右键复制媒体块：直接写剪贴板（不走 copy 事件），与 Cmd/Ctrl+C 同一条链路 */
+function copySelectedMedia(): void {
+  const ed = editor.value;
+  if (!ed) return;
+  const sel = ed.state.selection;
+  if (!(sel instanceof NodeSelection) || sel.node.type.name !== "attachment") return;
+  const id = sel.node.attrs.id as number | null;
+  void copyAttachmentToClipboard(ed.view, sel, id).then((ok) => {
+    if (ok) toast({ title: "已复制", description: "可粘贴到聊天窗口 / 文件夹 / 访达" });
+  });
+  closeCtxMenu();
+}
+
+/** 右键导出媒体文件：保存对话框选路径，后端拷贝附件文件；取消对话框不提示 */
+async function exportSelectedMedia(): Promise<void> {
+  const ed = editor.value;
+  if (!ed) return;
+  const sel = ed.state.selection;
+  if (!(sel instanceof NodeSelection) || sel.node.type.name !== "attachment") return;
+  const id = sel.node.attrs.id as number | null;
+  closeCtxMenu();
+  if (id == null) return;
+  try {
+    const path = await api.exportAttachment(id);
+    if (path) toast({ title: "导出成功", description: `已导出到 ${path}` });
+  } catch (e) {
+    toast({ title: "导出失败", description: errMsg(e), variant: "destructive" });
+  }
 }
 
 /** 菜单外点击关闭（面板自身 mousedown 已 preventDefault 保持选区） */
@@ -961,15 +1043,30 @@ defineExpose({
       :style="{ left: `${ctxMenu.x}px`, top: `${ctxMenu.y}px` }"
       @mousedown.prevent
     >
-      <!-- 媒体块菜单 -->
-      <button
-        v-if="ctxMenu.kind === 'media'"
-        type="button"
-        class="flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-accent"
-        @click="deleteSelectedMedia"
-      >
-        <Trash2 class="h-3.5 w-3.5" />删除媒体块
-      </button>
+      <!-- 媒体块菜单：复制 / 导出 / 删除 -->
+      <template v-if="ctxMenu.kind === 'media'">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-accent"
+          @click="copySelectedMedia"
+        >
+          <Copy class="h-3.5 w-3.5" />复制媒体块
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-accent"
+          @click="exportSelectedMedia"
+        >
+          <Download class="h-3.5 w-3.5" />导出媒体文件
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded px-2 py-1 text-xs hover:bg-accent hover:text-destructive"
+          @click="deleteSelectedMedia"
+        >
+          <Trash2 class="h-3.5 w-3.5" />删除媒体块
+        </button>
+      </template>
       <!-- 格式菜单（选中文字） -->
       <template v-else>
         <div class="flex items-center gap-1">

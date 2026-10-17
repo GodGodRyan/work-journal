@@ -246,6 +246,34 @@ pub fn get_attachment_data(state: State<AppState>, id: i64) -> Result<String, St
         .map_err(err_str)
 }
 
+/// 导出附件到用户选择的本地路径（右键媒体块「导出媒体文件」）。
+/// 返回保存路径；用户取消对话框返回 None
+#[tauri::command]
+// async：blocking 保存对话框不能在 sync 命令（主线程）里调用（同 export_report）
+pub async fn export_attachment(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<Option<String>, String> {
+    if id <= 0 {
+        return Err("附件 id 无效".to_string());
+    }
+    let (stored, file_name) = db_of(&state)?.attachment_file(id).map_err(err_str)?;
+    let picked = app
+        .dialog()
+        .file()
+        .set_title("导出媒体文件")
+        .set_file_name(&file_name)
+        .blocking_save_file();
+    let Some(path) = picked else {
+        return Ok(None); // 用户取消
+    };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    std::fs::copy(state.attach_dir.join(&stored), &path)
+        .map_err(|e| format!("导出文件失败：{e}"))?;
+    Ok(Some(path.display().to_string()))
+}
+
 // ---------- 时间线 / 搜索 / 标签 / 统计 ----------
 
 #[tauri::command]

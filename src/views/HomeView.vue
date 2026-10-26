@@ -124,14 +124,14 @@ watch(
   },
 );
 
-/** 新建记录：立即入库空记录并选中（后续编辑走自动保存） */
+/** 新建记录：立即入库并选中（默认标题「工作日志」，后续编辑走自动保存） */
 async function createRecord(): Promise<void> {
   if (store.dateRange) {
     toast({ title: "范围视图不支持新建", description: "请先退出范围视图，回到单日再新建记录" });
     return;
   }
   try {
-    const r = await api.createRecord(store.currentDate, "", "", "pending", "");
+    const r = await api.createRecord(store.currentDate, "工作日志", "", "pending", "");
     selectedId.value = r.id;
     await store.refreshAll();
   } catch (e) {

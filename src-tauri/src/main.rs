@@ -40,6 +40,7 @@ fn main() {
             commands::update_record,
             commands::soft_delete_record,
             commands::set_record_pinned,
+            commands::set_record_date,
             commands::get_pinned_records,
             commands::restore_record,
             commands::purge_record,

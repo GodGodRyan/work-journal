@@ -48,6 +48,11 @@ export function setPinned(id: number, pinned: boolean): Promise<WorkRecord> {
   return invoke("set_record_pinned", { id, pinned });
 }
 
+/** 移动记录到其他日期，返回更新后的记录 */
+export function setRecordDate(id: number, date: string): Promise<WorkRecord> {
+  return invoke("set_record_date", { id, date });
+}
+
 /** 全部置顶且未删除的记录（侧边栏置顶区固定展示） */
 export function listPinned(): Promise<WorkRecord[]> {
   return invoke("get_pinned_records");

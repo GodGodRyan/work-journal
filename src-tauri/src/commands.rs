@@ -108,6 +108,15 @@ pub fn set_record_pinned(
 }
 
 #[tauri::command]
+pub fn set_record_date(state: State<AppState>, id: i64, date: String) -> Result<db::WorkRecord, String> {
+    if id <= 0 {
+        return Err("记录 id 无效".to_string());
+    }
+    db::validate_date(&date).map_err(err_str)?;
+    db_of(&state)?.set_date(id, &date).map_err(err_str)
+}
+
+#[tauri::command]
 pub fn get_pinned_records(state: State<AppState>) -> Result<Vec<db::WorkRecord>, String> {
     db_of(&state)?.list_pinned().map_err(err_str)
 }

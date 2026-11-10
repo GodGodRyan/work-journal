@@ -73,16 +73,96 @@
     -webkit-user-drag: none;
   }
 
-  /* Tiptap 编辑器：空文档占位提示与段落间距 */
+  /* Tiptap 编辑器：空文档占位提示与富文本排版 */
+  .editor-shell .ProseMirror {
+    outline: none;
+  }
   .editor-shell .ProseMirror p {
     margin: 0.3em 0;
   }
+  /* 占位提示：attr(data-placeholder) 读取的是 p 元素自身属性（编辑器根上的 data-placeholder 读不到），
+     故直接硬编码文案 */
   .editor-shell .ProseMirror p.is-editor-empty:first-child::before {
-    content: "详细工作描述（支持多行文本，可粘贴/拖入图片与媒体文件，选中文字右键可调整格式）…";
+    content: "工作内容（工具栏可调整格式，支持粘贴/拖入图片与媒体文件）…";
     float: left;
     height: 0;
     pointer-events: none;
     color: hsl(var(--muted-foreground));
+  }
+  .editor-shell .ProseMirror h1 {
+    margin: 0.7em 0 0.35em;
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .editor-shell .ProseMirror h2 {
+    margin: 0.6em 0 0.3em;
+    font-size: 1.3em;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  .editor-shell .ProseMirror h3 {
+    margin: 0.5em 0 0.25em;
+    font-size: 1.15em;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .editor-shell .ProseMirror ul {
+    margin: 0.3em 0;
+    padding-left: 1.4em;
+    list-style: disc;
+  }
+  .editor-shell .ProseMirror ol {
+    margin: 0.3em 0;
+    padding-left: 1.4em;
+    list-style: decimal;
+  }
+  .editor-shell .ProseMirror ul ul,
+  .editor-shell .ProseMirror ol ol,
+  .editor-shell .ProseMirror ul ol,
+  .editor-shell .ProseMirror ol ul {
+    margin: 0;
+  }
+  .editor-shell .ProseMirror li > p {
+    margin: 0.15em 0;
+  }
+  .editor-shell .ProseMirror blockquote {
+    margin: 0.4em 0;
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 0.8em;
+    color: hsl(var(--muted-foreground));
+  }
+  .editor-shell .ProseMirror pre {
+    margin: 0.4em 0;
+    border-radius: calc(var(--radius) - 4px);
+    background: hsl(var(--muted));
+    padding: 0.6em 0.8em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    overflow-x: auto;
+  }
+  .editor-shell .ProseMirror code {
+    border-radius: calc(var(--radius) - 6px);
+    background: hsl(var(--muted));
+    padding: 0.1em 0.3em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+  .editor-shell .ProseMirror pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
+  .editor-shell .ProseMirror a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+  .editor-shell .ProseMirror hr {
+    margin: 0.6em 0;
+    border: none;
+    border-top: 1px solid hsl(var(--border));
   }
   /* 文件拖入编辑器时的悬停提示框 */
   .editor-shell .ProseMirror.drag-over {

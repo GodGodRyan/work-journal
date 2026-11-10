@@ -199,6 +199,19 @@ async function onDeleted(): Promise<void> {
   selectedId.value = store.filteredRecords[0]?.id ?? null;
 }
 
+/**
+ * 记录移动到其他日期：刷新列表/日历圆点/置顶区，再跳到目标日期并选中。
+ * 顺序：exitRange → refreshAll（按当前日期重载，移动走的记录已消失）→ setDate 触发 watch 重载目标日 → 选中。
+ * 若目标日期与当前日期相同，setDate 不触发 watch，refreshAll 已加载正确列表，直接选中即可。
+ */
+async function onMoved(r: WorkRecord): Promise<void> {
+  if (store.dateRange) store.exitRange();
+  await store.refreshAll();
+  store.setDate(r.record_date);
+  await nextTick();
+  selectedId.value = r.id;
+}
+
 // ---- 列表右键删除（确认后软删除，与编辑器删除一致） ----
 // 弹窗开关与删除目标分离：点「删除」时 reka 会先触发 update:open(false)，
 // 若在该回调里清 deleteTarget，confirmListDelete 将读取到 null 而静默跳过
@@ -427,6 +440,7 @@ async function exportReport(kind: ExportKind): Promise<void> {
             :record="selectedRecord"
             @saved="onSaved"
             @deleted="onDeleted"
+            @moved="onMoved"
             @create="createRecord"
             @toggle-pinned="selectedRecord && togglePinned(selectedRecord.id)"
           />

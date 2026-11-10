@@ -574,6 +574,18 @@ impl Db {
         self.get(id)?.ok_or_else(|| anyhow!("记录置顶更新后读取失败"))
     }
 
+    /// 移动到其他日期。日期不参与 FTS 索引，触发器重建索引行无副作用。
+    pub fn set_date(&self, id: i64, date: &str) -> Result<WorkRecord> {
+        let n = self.conn.execute(
+            "UPDATE records SET record_date = ?2, updated_at = ?3 WHERE id = ?1 AND is_deleted = 0",
+            params![id, date, now_str()],
+        )?;
+        if n == 0 {
+            bail!("记录不存在或已在回收站中");
+        }
+        self.get(id)?.ok_or_else(|| anyhow!("记录改期后读取失败"))
+    }
+
     /// 软删除：移入回收站（触发器同步移除 FTS 索引）
     pub fn soft_delete(&self, id: i64) -> Result<()> {
         let n = self.conn.execute(
@@ -1494,6 +1506,27 @@ mod tests {
         assert!(db.set_pinned(9999, true).is_err());
         db.soft_delete(r.id).unwrap();
         assert!(db.set_pinned(r.id, true).is_err());
+    }
+
+    #[test]
+    fn set_date_moves_record_and_rejects_invalid() {
+        let db = Db::open_in_memory().unwrap();
+        let r = db
+            .create("2026-10-09", "标题", "内容", "pending", "")
+            .unwrap();
+        assert_eq!(db.list_by_date("2026-10-09").unwrap().len(), 1);
+        // 移动后原日期列表消失、目标日期出现
+        let moved = db.set_date(r.id, "2026-10-26").unwrap();
+        assert_eq!(moved.record_date, "2026-10-26");
+        assert!(db.list_by_date("2026-10-09").unwrap().is_empty());
+        assert_eq!(db.list_by_date("2026-10-26").unwrap().len(), 1);
+        // 改期不影响其他字段与 FTS 索引（触发器重建后仍可搜索）
+        assert_eq!(moved.title, "标题");
+        assert_eq!(db.search("标题", None, None).unwrap().len(), 1);
+        // 不存在与已软删除的记录报错
+        assert!(db.set_date(9999, "2026-10-26").is_err());
+        db.soft_delete(r.id).unwrap();
+        assert!(db.set_date(r.id, "2026-10-26").is_err());
     }
 
     #[test]
